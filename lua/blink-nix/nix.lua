@@ -65,7 +65,8 @@ end
 ---@return string[]
 function NixComps:get_candidates(ctx)
     local before = vim.trim(ctx.line:sub(1, ctx.cursor[2]))
-    local nix_attr_path = vim.split(before, "%.")
+    local prefix = before:match("[%w%._-]+$")
+    local nix_attr_path = vim.split(prefix, "%.")
     return vim.iter(self:_candidates(nix_attr_path)):map(self._transform_candidate):totable()
 end
 
