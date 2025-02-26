@@ -14,13 +14,21 @@ function NixComps._transform_candidate(candidate)
     }
 end
 
+---@type string[]
+local cached_pkgs = {}
+
 ---@param nix_attr_path string[]
 ---@return string[]
 function NixComps:_candidates(nix_attr_path)
+    if self.job then
+        self.job:kill(9)
+    end
+
     -- TODO: Abstract this out to allow users to provide their own expr's.
     -- For now, this will do.
     ---@type string[]
     local candidates = {
+        pkgs = [[builtins.attrNames ((import <nixpkgs> { }))]],
         lib = [[builtins.attrNames ((import <nixpkgs/lib>)%s)]],
         builtins = [[builtins.attrNames (builtins%s)]],
     }
@@ -30,6 +38,15 @@ function NixComps:_candidates(nix_attr_path)
     end
 
     local mod = table.remove(nix_attr_path, 1)
+
+    if mod == "pkgs" and #cached_pkgs > 0 then
+        if #nix_attr_path == 1 then
+            return cached_pkgs
+        elseif #nix_attr_path > 1 then
+            mod = table.remove(nix_attr_path, 1)
+        end
+    end
+
     if not candidates[mod] then
         return {}
     end
@@ -37,10 +54,6 @@ function NixComps:_candidates(nix_attr_path)
     table.remove(nix_attr_path)
 
     local attr_path = vim.iter(nix_attr_path):join(".")
-
-    if self.job then
-        self.job:kill(9)
-    end
 
     self.job = vim.system({
         "nix",
@@ -50,7 +63,6 @@ function NixComps:_candidates(nix_attr_path)
         "--expr",
         (candidates[mod]):format(attr_path ~= "" and "." .. attr_path or ""),
     })
-
     local out = self.job:wait()
 
     if out.code > 0 then
@@ -58,6 +70,9 @@ function NixComps:_candidates(nix_attr_path)
     end
 
     candidates = vim.json.decode(out.stdout)
+    if mod == "pkgs" then
+        cached_pkgs = candidates
+    end
     return candidates
 end
 
