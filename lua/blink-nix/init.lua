@@ -1,4 +1,14 @@
-local async = require("blink.cmp.lib.async")
+local success, async = pcall(require, "blink.lib.task")
+
+-- If we cant get the newer lib from `blink.lib` part of blink.cmp v2, then
+-- fallback to the v1 equivalent
+if not success then
+    -- HACK: Using the `v1` branch of `blink.cmp` -- shim it for compatibility
+    async = require("blink.cmp.lib.async")
+    async.resolve = async.empty
+    async.on_resolve = async.on_completion
+    async.on_reject = async.on_failure
+end
 
 ---@type blink.cmp.Source
 ---@diagnostic disable-next-line: missing-fields
@@ -20,7 +30,7 @@ end
 
 ---@param ctx blink.cmp.Context
 function M:get_completions(ctx, callback)
-    local task = async.task.empty():map(function()
+    local task = async.resolve():map(function()
         local is_char_trigger = vim.list_contains(
             self:get_trigger_characters(),
             ctx.line:sub(ctx.bounds.start_col - 1, ctx.bounds.start_col - 1)
